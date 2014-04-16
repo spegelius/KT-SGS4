@@ -27,7 +27,7 @@
 #include "board-8064.h"
 #include <mach/apq8064-gpio.h>
 
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 /* The SPI configurations apply to GSBI 5*/
 static struct gpiomux_setting gpio_spi_config = {
 	.func = GPIOMUX_FUNC_2,
@@ -420,7 +420,7 @@ static struct gpiomux_setting gsbi7_func2_cfg = {
 };
 
 static struct gpiomux_setting gsbi3_suspended_cfg = {
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_DOWN,
@@ -436,7 +436,7 @@ static struct gpiomux_setting gsbi3_active_cfg = {
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 static struct gpiomux_setting gsbi2_suspend_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_8MA,
@@ -721,7 +721,7 @@ static struct msm_gpiomux_config apq8064_hdmi_configs[] __initdata = {
 		},
 	},
 };
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 static struct msm_gpiomux_config sensorhub_configs[] __initdata = {
 	{
 		.gpio      = 69,
@@ -759,7 +759,7 @@ static struct msm_gpiomux_config apq8064_gsbi_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gsbi1_uart_config,
 		},
 	},
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	{
 		.gpio      = 21,		/* GSBI1 QUP I2C_CLK */
 		.settings = {
@@ -771,7 +771,7 @@ static struct msm_gpiomux_config apq8064_gsbi_configs[] __initdata = {
 	{
 		.gpio      = 24,	/* GSBI2 I2C QUP SDA */
 		.settings = {
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 			[GPIOMUX_SUSPENDED] = &gsbi2_suspend_cfg,
 #else
 			[GPIOMUX_SUSPENDED] = &gsbi2,
@@ -1410,7 +1410,7 @@ static struct gpiomux_setting sd_det_line = {
 	.pull = GPIOMUX_PULL_UP,
 	.dir = GPIOMUX_IN,
 };
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 /*
 static struct gpiomux_setting sd_det_suspended_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -1529,7 +1529,7 @@ static struct msm_gpiomux_config apq8064_muic_config[] __initdata = {
 	},
 };
 #endif
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 static struct gpiomux_setting nc_init_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv  = GPIOMUX_DRV_2MA,
@@ -1660,7 +1660,7 @@ void __init apq8064_init_gpiomux(void)
 	else
 		msm_gpiomux_install(sdc2_interface,
 				ARRAY_SIZE(sdc2_interface));
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	msm_gpiomux_install(msm8064_ls_en_config,
 			ARRAY_SIZE(msm8064_ls_en_config));
 #endif
@@ -1688,7 +1688,7 @@ void __init apq8064_init_gpiomux(void)
 		msm_gpiomux_install(apq8064_gsbi_configs,
 				ARRAY_SIZE(apq8064_gsbi_configs));
 	}
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	msm_gpiomux_install(sensorhub_configs,
 			ARRAY_SIZE(sensorhub_configs));
 #endif
@@ -1707,7 +1707,7 @@ void __init apq8064_init_gpiomux(void)
 	pr_debug("%s(): audio-auxpcm: Include GPIO configs"
 		" as audio is not the primary user"
 		" for these GPIO Pins\n", __func__);
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
     msm_gpiomux_install(apq8064_auxpcm_configs,
         ARRAY_SIZE(apq8064_auxpcm_configs));
 #endif
@@ -1775,7 +1775,7 @@ void __init apq8064_init_gpiomux(void)
 	msm_gpiomux_install(apq8064_muic_config,
 		ARRAY_SIZE(apq8064_muic_config));
 #endif
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	if( system_rev >= 16 ) // rev0.6 + 10
 	{
 		msm_gpiomux_install(apq8064_nc_config_rev06,

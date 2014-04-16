@@ -413,7 +413,7 @@ static int msm_mctl_cmd(struct msm_cam_media_controller *p_mctl,
 				break;
 			}
 #if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-			eeprom_data.is_eeprom_supported = 1;
+			eeprom_data.is_eeprom_supported = 1;	//Check by teddy
 #else
 			eeprom_data.is_eeprom_supported = 0;
 #endif

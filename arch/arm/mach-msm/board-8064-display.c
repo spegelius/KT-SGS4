@@ -897,6 +897,7 @@ static int mipi_panel_power_oled(int enable)
 	int rc = 0;
 
 	if (enable) {
+
 		pr_info("[lcd] PANEL ON\n");
 
 		/* 3000mv VCI(ANALOG) */
@@ -934,6 +935,7 @@ static int mipi_panel_power_oled(int enable)
 		if (ktoonservative_is_activef)
 			screen_is_on_relay_kt(true);
 	} else {
+
 		pr_info("[lcd] PANEL OFF\n");
 
 #ifdef CONFIG_LCD_VDD3_BY_PMGPIO
