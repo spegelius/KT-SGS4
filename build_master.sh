@@ -20,6 +20,7 @@ export ARCH=arm
 # export CROSS_COMPILE=/home/ktoonsez/aokp4.2/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-
 #export CROSS_COMPILE=$PARENT_DIR/linaro4.7/bin/arm-eabi-
 export CROSS_COMPILE=/home/spegelius/storage/toolchain/linaro-4.7-12.10/bin/arm-linux-gnueabihf-
+#export CROSS_COMPILE=/home/spegelius/storage/CM11/prebuilts/gcc/linux-x86/arm/arm-eabi-4.7/bin/arm-eabi-
 
 time_start=$(date +%s.%N)
 

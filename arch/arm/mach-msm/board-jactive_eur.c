@@ -4135,7 +4135,7 @@ static struct spi_board_info spi_board_info[] __initdata = {
 static int  es325_enable_VDD_CORE(void)
 {
 	static struct regulator *l18;
-#if defined(CONFIG_MACH_JACTIVE_ATT) && defined(CONFIG_MACH_JACTIVE_EUR)
+#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	static struct regulator *l27;
 	int ret;
 	
