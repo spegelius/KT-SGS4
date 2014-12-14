@@ -614,6 +614,13 @@ void ddl_vidc_encode_init_codec(struct ddl_client_context *ddl)
 		encoder->frame_size.height);
 	vidc_1080p_encode_set_qp_params(encoder->qp_range.max_qp,
 		encoder->qp_range.min_qp);
+	vidc_sm_set_i_frame_qp(&ddl->shared_mem[ddl->command_channel],
+		encoder->qp_range.max_qp,
+		encoder->qp_range.min_qp);
+	if (encoder->session_qp.i_frame_qp < encoder->qp_range.min_qp)
+		encoder->session_qp.i_frame_qp = encoder->qp_range.min_qp;
+	if (encoder->session_qp.i_frame_qp > encoder->qp_range.max_qp)
+		encoder->session_qp.i_frame_qp = encoder->qp_range.max_qp;
 	vidc_1080p_encode_set_rc_config(encoder->rc_level.frame_level_rc,
 		encoder->rc_level.mb_level_rc,
 		encoder->session_qp.i_frame_qp);

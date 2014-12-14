@@ -2513,6 +2513,8 @@ static void sii8240_set_colorspace
 
 	if (pack_pixel)
 		colorspace = 0x02;
+	else if (input_range != 0x04)
+		input_range = 0x08;
 	data = colorspace|input_range;
 	ret = mhl_modify_reg(tpi, 0x0A,
 		BIT_TPI_OUTPUT_FORMAT_MASK |

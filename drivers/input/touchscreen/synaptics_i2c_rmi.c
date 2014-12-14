@@ -4012,6 +4012,9 @@ int synaptics_rmi4_reset_device(struct synaptics_rmi4_data *rmi4_data)
 			msleep(SYNAPTICS_HW_RESET_TIME);
 
 	} else {
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_PREVENT_HSYNC_LEAKAGE)
+		rmi4_data->board->hsync_onoff(false);
+#endif
 		rmi4_data->board->power(false);
 		msleep(30);
 		rmi4_data->board->power(true);
@@ -4023,6 +4026,9 @@ int synaptics_rmi4_reset_device(struct synaptics_rmi4_data *rmi4_data)
 		else
 			msleep(SYNAPTICS_HW_RESET_TIME);
 
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_PREVENT_HSYNC_LEAKAGE)
+		rmi4_data->board->hsync_onoff(true);
+#endif
 		retval = synaptics_rmi4_f54_set_control(rmi4_data);
 		if (retval < 0)
 			dev_err(&rmi4_data->i2c_client->dev,
@@ -4365,8 +4371,14 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 	/* define panel version : M4 / M4+ */
 	rmi4_data->panel_revision = rmi4_data->board->panel_revision;
 
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_PREVENT_HSYNC_LEAKAGE)
+	rmi4_data->board->hsync_onoff(false);
+#endif
 	rmi4_data->board->power(true);
 
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_PREVENT_HSYNC_LEAKAGE)
+	rmi4_data->board->hsync_onoff(true);
+#endif
 	rmi4_data->i2c_read = synaptics_rmi4_i2c_read;
 	rmi4_data->i2c_write = synaptics_rmi4_i2c_write;
 	rmi4_data->irq_enable = synaptics_rmi4_irq_enable;
@@ -4681,6 +4693,9 @@ static int synaptics_rmi4_input_open(struct input_dev *dev)
 
 	if (rmi4_data->touch_stopped) {
 
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_PREVENT_HSYNC_LEAKAGE)
+		rmi4_data->board->hsync_onoff(false);
+#endif
 		rmi4_data->board->power(true);
 		rmi4_data->touch_stopped = false;
 
@@ -4871,9 +4886,15 @@ void set_screen_synaptic_on(void)
 	if (screen_wake_options_hold_wlock || wake_lock_active(&wakelock))
 		wake_unlock(&wakelock);
 
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_PREVENT_HSYNC_LEAKAGE)
+	rmi4_data->board->hsync_onoff(false);
+#endif
 	rmi4_data->board->power(true);
 	rmi4_data->touch_stopped = false;
 	rmi4_data->current_page = MASK_8BIT;
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_PREVENT_HSYNC_LEAKAGE)
+	rmi4_data->board->hsync_onoff(true);
+#endif
 
 	if (screen_wake_options_when_off && !call_in_progress)
 	{
@@ -4895,13 +4916,26 @@ void set_screen_synaptic_on(void)
 			dev_info(&rmi4_data->i2c_client->dev, "%s: tsp int request failed, ret=%d", __func__, retval);
 		}
 	}
-	
-	ret = synaptics_rmi4_reinit_device(rmi4_data);
-	if (ret < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Failed to reinit device\n",
-				__func__);
-	}
+#ifdef CONFIG_TOUCHSCREEN_FACTORY_PLATFORM
+		retval = synaptics_rmi4_query_device(rmi4_data);
+		if (retval < 0)
+			dev_err(&rmi4_data->i2c_client->dev,
+					"%s: Failed to query device\n",
+					__func__);
+		retval = synaptics_rmi4_open_lcd_ldi(rmi4_data);
+		if (retval < 0)
+			dev_err(&rmi4_data->i2c_client->dev,
+					"%s: Failed to read ldi ID2\n",
+					__func__);
+
+#else
+		retval = synaptics_rmi4_reinit_device(rmi4_data);
+		if (retval < 0) {
+			dev_err(&rmi4_data->i2c_client->dev,
+					"%s: Failed to reinit device\n",
+					__func__);
+		}
+#endif
 
 	if (rmi4_data->ta_status)
 		synaptics_charger_conn(rmi4_data, rmi4_data->ta_status);
