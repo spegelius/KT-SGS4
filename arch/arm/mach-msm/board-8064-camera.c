@@ -81,7 +81,7 @@ static struct gpiomux_setting cam_settings[] = {
 
 	{
 		.func = GPIOMUX_FUNC_1, /*active 1*/
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
+#if defined(CONFIG_MACH_JACTIVE_EUR)
 		.drv = GPIOMUX_DRV_4MA,
 #else
 		.drv = GPIOMUX_DRV_2MA,
@@ -153,7 +153,11 @@ static struct gpiomux_setting cam_settings[] = {
 	},
 	{
 		.func = GPIOMUX_FUNC_4, /*active 12*/
+#if defined(CONFIG_MACH_JACTIVE_EUR)
+		.drv = GPIOMUX_DRV_4MA,
+#else
 		.drv = GPIOMUX_DRV_2MA,
+#endif
 		.pull = GPIOMUX_PULL_NONE,
 		.dir = GPIOMUX_OUT_LOW,
 	},
@@ -371,10 +375,6 @@ static int get_system_rev(void)
 static void cam_ldo_power_on(void)
 {
 	int ret = 0;
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
-	int cam_type = 0;
-#endif	
-
 	printk(KERN_DEBUG "[JC] %s: In\n", __func__);
 
 	printk(KERN_DEBUG "[JC] %s: system_rev=%d\n", __func__, system_rev);
@@ -419,26 +419,9 @@ static void cam_ldo_power_on(void)
 			__func__);
 	}
 
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
-	cam_type = gpio_get_value(GPIO_CAM_SENSOR_DET);
-
-	printk(KERN_DEBUG "[JC] %s: SENSOR TYPE = %d\n", __func__, cam_type);
-#endif
-
 	/* CAM_DVDD1.1V_1.2V*/
 	l28 = regulator_get(NULL, "8921_l28");
-
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
-	if (cam_type == 1) {
-		printk(KERN_DEBUG "[JC] %s: Sony Sensor 1.1V", __func__);
-		regulator_set_voltage(l28, 1100000, 1100000);
-	}
-	else {
-		printk(KERN_DEBUG "[JC] %s: LSI Sensor 1.2V", __func__);
-		regulator_set_voltage(l28, 1200000, 1200000);	
-	}
-#endif
-	
+	regulator_set_voltage(l28, 1100000, 1100000);
 	ret = regulator_enable(l28);
 	if (ret)
 		printk(KERN_DEBUG "error enabling regulator 8921_l28\n");
@@ -537,11 +520,7 @@ static void cam_ldo_power_on_sub(void)
 	usleep(1*1000);
 
 	l28 = regulator_get(NULL, "8921_l28");
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
-	regulator_set_voltage(l28, 1200000, 1200000);
-#else
 	regulator_set_voltage(l28, 1100000, 1100000);
-#endif
 	ret = regulator_enable(l28);
 	if (ret)
 		printk(KERN_DEBUG "error enabling regulator 8921_l28 \n");
@@ -590,7 +569,7 @@ static void cam_ldo_power_off(void)
 	int ret = 0;
 	printk(KERN_DEBUG "[Fortius] %s: Off\n", __func__);
 
-	if(l28){ 
+	if(l28){
 		ret = regulator_disable(l28);
 		if (ret)
 			printk(KERN_DEBUG "error disabling regulator 8921_l28 \n");;
@@ -622,7 +601,7 @@ static void cam_ldo_af_power_off(void)
 static void cam_ldo_vddio_power_off(void)
 {
 	int ret = 0;
-	
+
 	/* CAM_HOST_1.8V*/
 	if (system_rev == 0) {
 		if (lvs5) {
@@ -684,7 +663,7 @@ static void vt_cam_ldo_power_off(void)
 		if (ret)
 			printk(KERN_DEBUG "error disabling regulator 8921_l21\n");
 	}
-	
+
 	usleep(400);
 
 	/* CAM_SENSOR_2.8V (CIS 2.8V)*/
@@ -763,11 +742,7 @@ static struct msm_bus_vectors cam_preview_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_VFE,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
-		.ab  = 300000000,//27648000,
-#else
 		.ab  = 27648000,
-#endif
 		.ib  = 2656000000UL,	/*110592000,*/
 	},
 	{
@@ -809,11 +784,7 @@ static struct msm_bus_vectors cam_snapshot_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_VFE,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
-		.ab  = 800000000,//600000000,	/*274423680,*/
-#else
-        .ab  = 600000000,	/*274423680,*/
-#endif
+		.ab  = 600000000,	/*274423680,*/
 		.ib  = 2656000000UL,
 	},
 	{
@@ -857,9 +828,6 @@ static struct msm_bus_vectors cam_preview_vectors[] = {
 		.src = MSM_BUS_MASTER_VFE,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab  = 27648000,
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
-		.ib  = 110592000,
-#endif
 	},
 	{
 		.src = MSM_BUS_MASTER_VPE,
@@ -879,13 +847,8 @@ static struct msm_bus_vectors cam_video_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_VFE,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
-		.ab  = 274406400,
-		.ib  = 561807360,
-#else
 		.ab  = 600000000,
 		.ib  = 2656000000UL,
-#endif
 	},
 	{
 		.src = MSM_BUS_MASTER_VPE,
@@ -905,13 +868,8 @@ static struct msm_bus_vectors cam_snapshot_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_VFE,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
-		.ab  = 274423680,
-		.ib  = 1097694720,
-#else
 		.ab  = 600000000,
 		.ib  = 2656000000UL,
-#endif
 	},
 	{
 		.src = MSM_BUS_MASTER_VPE,
@@ -931,13 +889,8 @@ static struct msm_bus_vectors cam_zsl_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_VFE,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
-		.ab  = 302071680,
-		.ib  = 1208286720,
-#else
 		.ab  = 600000000,
 		.ib  = 2656000000UL,
-#endif
 	},
 	{
 		.src = MSM_BUS_MASTER_VPE,
@@ -1205,7 +1158,6 @@ static struct msm_camera_i2c_conf apq8064_front_cam_i2c_conf = {
 	.use_i2c_mux = 0,
 };
 
-#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)			
 static struct msm_camera_sensor_flash_data flash_imx135 = {
 	.flash_type = MSM_CAMERA_FLASH_NONE,
 };
@@ -1234,7 +1186,6 @@ static struct msm_camera_sensor_info msm_camera_sensor_imx135_data = {
 	.sensor_type = BAYER_SENSOR,
 	.actuator_info = &msm_act_main_cam_1_info,
 };
-#endif
 
 static struct msm_camera_sensor_flash_data flash_imx074 = {
 	.flash_type	= MSM_CAMERA_FLASH_LED,
@@ -1362,7 +1313,7 @@ static struct msm_camera_csi_lane_params s5k3h5xa_csi_lane_params = {
 static int pmic_set_func(uint8_t pmic_gpio, uint8_t onoff)
 {
 	pmic_gpio_ctrl(PM8921_GPIO_PM_TO_SYS(pmic_gpio), onoff);
-		
+
 	return 0;
 }
 
@@ -1393,9 +1344,9 @@ static struct msm_camera_sensor_platform_info sensor_board_info_s5k3h5xa = {
 	.sensor_power_on = cam_ldo_power_on,
 	.sensor_power_off = cam_ldo_power_off,
 #if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-	.sensor_power_on_sub = cam_ldo_power_on_sub,	
-	.sensor_power_off_sub = cam_ldo_power_off_sub,	
-#endif	
+	.sensor_power_on_sub = cam_ldo_power_on_sub,
+	.sensor_power_off_sub = cam_ldo_power_off_sub,
+#endif
 	.sensor_pmic_gpio_ctrl = pmic_gpio_ctrl,
 	.reset = GPIO_13M_CAM_RESET,
 };
@@ -1410,7 +1361,7 @@ static struct msm_camera_sensor_info msm_camera_sensor_s5k3h5xa_data = {
 #if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	.actuator_info = &msm_act_main_cam_2_info,
 	.eeprom_info = &imx175_eeprom_info,
-#endif	
+#endif
 };
 
 static struct msm_camera_sensor_flash_data flash_mt9m114 = {
@@ -1583,19 +1534,6 @@ struct pm_gpio cam_init_in_cfg = {
 	.output_value = 0,
 };
 
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)			
-struct pm_gpio cam_rear_det = {
-		.direction		= PM_GPIO_DIR_IN,
-		.pull			= PM_GPIO_PULL_NO,
-		.out_strength		= PM_GPIO_STRENGTH_LOW,
-		.function		= PM_GPIO_FUNC_NORMAL,
-		.inv_int_pol		= 0,
-		.vin_sel		= PM_GPIO_VIN_S4,
-		.output_buffer		= PM_GPIO_OUT_BUF_CMOS,
-		.output_value		= 0,
-};
-#endif
-
 void __init apq8064_init_cam(void)
 {
 	printk(KERN_DEBUG "[JC] %s: In\n", __func__);
@@ -1615,9 +1553,6 @@ void __init apq8064_init_cam(void)
 #endif
 
 	pm8xxx_gpio_config(GPIO_CAM_A_EN2, &cam_init_out_cfg);
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-	pm8xxx_gpio_config(GPIO_CAM_SENSOR_DET, &cam_rear_det);
-#endif
 
 	/* temp: need to set low because bootloader make high signal. */
 	pmic_gpio_ctrl(GPIO_CAM_VT_EN, 0);
@@ -1650,12 +1585,10 @@ static struct i2c_board_info apq8064_camera_i2c_boardinfo[] = {
 	I2C_BOARD_INFO("imx074", 0x10),
 	.platform_data = &msm_camera_sensor_imx074_data,
 	},
-#if !defined(CONFIG_MACH_JACTIVE_ATT) && !defined(CONFIG_MACH_JACTIVE_EUR)
 	{
 	I2C_BOARD_INFO("imx135", 0x10),
 	.platform_data = &msm_camera_sensor_imx135_data,
 	},
-#endif
 	{
 	I2C_BOARD_INFO("mt9m114", 0x48),
 	.platform_data = &msm_camera_sensor_mt9m114_data,

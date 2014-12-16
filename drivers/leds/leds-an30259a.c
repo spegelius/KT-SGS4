@@ -24,6 +24,9 @@
 #include <linux/leds-an30259a.h>
 #include <linux/workqueue.h>
 #include <linux/wakelock.h>
+#include <linux/time.h>
+#include <linux/syscalls.h>
+#include <linux/cpufreq_kt.h>
 
 /* AN30259A register map */
 #define AN30259A_REG_SRESET		0x00
@@ -82,6 +85,9 @@
 
 #define	MAX_NUM_LEDS	3
 
+static struct delayed_work check_led_time;
+static bool is_work_active = false;
+
 u8 LED_DYNAMIC_CURRENT = 0x8;
 u8 LED_LOWPOWER_MODE = 0x0;
 
@@ -118,6 +124,7 @@ enum an30259a_pattern {
 	LOW_BATTERY,
 	FULLY_CHARGED,
 	POWERING,
+	BOOTING,
 };
 
 struct an30259a_led {
@@ -150,11 +157,25 @@ u8 led_intensity = 0;
 
 unsigned int led_time_on = 0;		//If greater than ZERO override the ROMs LED ON LENGTH in ms
 unsigned int led_time_off = 0;		//If greater than ZERO override the ROMs LED OFF LENGTH in ms
-u8 led_step_speed1 = 1;	//Set bitwise value for fade effect steps1
-u8 led_step_speed2 = 1;	//Set bitwise value for fade effect steps2
-u8 led_step_speed3 = 1;	//Set bitwise value for fade effect steps3
-u8 led_step_speed4 = 1;	//Set bitwise value for fade effect steps4
-u8 led_step_bit_shift = 4;	//Set bitwise value for fade effect steps4
+u8 led_step_speed1 = 1;			//Set bitwise value for fade effect steps1
+u8 led_step_speed2 = 1;			//Set bitwise value for fade effect steps2
+u8 led_step_speed3 = 1;			//Set bitwise value for fade effect steps3
+u8 led_step_speed4 = 1;			//Set bitwise value for fade effect steps4
+u8 led_step_bit_shift = 4;		//Set bitwise value for fade effect steps4
+int led_block_leds_time_start = -1;
+int led_block_leds_time_stop = -1;
+int led_always_disable = 0;
+
+static bool block_leds_not_blocking = false;
+static bool block_leds_check_allowed = true;
+static int block_leds_saved_mode = -1;
+static unsigned int block_leds_saved_delay_on_time[3];
+static unsigned int block_leds_saved_delay_off_time[3];
+static u8 block_leds_saved_brightness[3];
+static int led_debug_enable = 0;
+
+static void an30259a_start_led_pattern(int mode);
+static void an30259a_set_led_blink(enum an30259a_led_enum led, unsigned int delay_on_time, unsigned int delay_off_time, u8 brightness);
 
 /*path : /sys/class/sec/led/led_pattern*/
 /*path : /sys/class/sec/led/led_blink*/
@@ -336,6 +357,97 @@ static void an30259a_reset_register_work(struct work_struct *work)
 		printk(KERN_WARNING "leds_i2c_write_all failed\n");
 }
 
+static bool check_restrictions(void)
+{
+	struct timeval curtime;
+	struct tm tmv;
+	int curhour;
+	bool ret = true;
+	
+	if (led_always_disable)
+	{
+		/* Set all LEDs Off */
+		an30259a_reset_register_work(0);
+		ret = false;
+		goto skipitall;
+	}
+	if (led_block_leds_time_start != -1 && led_block_leds_time_stop != -1)
+	{
+		do_gettimeofday(&curtime);
+		time_to_tm(curtime.tv_sec, 0, &tmv);
+	
+		curhour = tmv.tm_hour + ((sys_tz.tz_minuteswest / 60) * -1);
+		if (curhour < 0)
+			curhour = 24 + curhour;
+		if (curhour > 23)
+			curhour = curhour - 24;
+	
+		if (led_debug_enable) pr_alert("CHECK LED TIME RESTRICTION: %d:%d:%d:%ld -- %d -- %d -- %d\n", tmv.tm_hour, tmv.tm_min, 
+				         tmv.tm_sec, curtime.tv_usec, sys_tz.tz_minuteswest, sys_tz.tz_dsttime, curhour);
+		if (led_block_leds_time_start > led_block_leds_time_stop)
+		{
+			if (curhour >= led_block_leds_time_start || curhour < led_block_leds_time_stop)
+				ret = false;
+		}
+		else
+		{
+			if (curhour >= led_block_leds_time_start && curhour < led_block_leds_time_stop)
+				ret = false;
+		}
+		if (!ret)
+		{
+			/* Set all LEDs Off */
+			an30259a_reset_register_work(0);
+		}
+		
+		//Check to see if its ok to turn on LED now but was blocking previously
+		if (ret && !block_leds_not_blocking)
+		{
+			if (block_leds_saved_mode != -1)
+			{
+				if (led_debug_enable) pr_alert("RESTORE LED MODE - %d", block_leds_saved_mode);
+				block_leds_check_allowed = false;
+				an30259a_start_led_pattern(block_leds_saved_mode);
+				block_leds_check_allowed = true;
+			}
+			if (block_leds_saved_delay_on_time[0] != -1)
+			{
+				if (led_debug_enable) pr_alert("RESTORE FROM RESTRICT LED BLINK0 - %d - %d - %d", block_leds_saved_delay_on_time[0], block_leds_saved_delay_off_time[0], block_leds_saved_brightness[0]);
+				block_leds_check_allowed = false;
+				an30259a_set_led_blink(0, block_leds_saved_delay_on_time[0], block_leds_saved_delay_off_time[0], block_leds_saved_brightness[0]);
+				block_leds_check_allowed = true;
+			}
+			if (block_leds_saved_delay_on_time[1] != -1)
+			{
+				if (led_debug_enable) pr_alert("RESTORE FROM RESTRICT LED BLINK1 - %d - %d - %d", block_leds_saved_delay_on_time[1], block_leds_saved_delay_off_time[1], block_leds_saved_brightness[1]);
+				block_leds_check_allowed = false;
+				an30259a_set_led_blink(1, block_leds_saved_delay_on_time[1], block_leds_saved_delay_off_time[1], block_leds_saved_brightness[1]);
+				block_leds_check_allowed = true;
+			}
+			if (block_leds_saved_delay_on_time[2] != -1)
+			{
+				if (led_debug_enable) pr_alert("RESTORE FROM RESTRICT LED BLINK2 - %d - %d - %d", block_leds_saved_delay_on_time[2], block_leds_saved_delay_off_time[2], block_leds_saved_brightness[2]);
+				block_leds_check_allowed = false;
+				an30259a_set_led_blink(2, block_leds_saved_delay_on_time[2], block_leds_saved_delay_off_time[2], block_leds_saved_brightness[2]);
+				block_leds_check_allowed = true;
+			}
+			block_leds_saved_mode = -1;
+			block_leds_saved_delay_on_time[0] = -1;
+			block_leds_saved_delay_off_time[0] = -1;
+			block_leds_saved_brightness[0] = -1;
+			block_leds_saved_delay_on_time[1] = -1;
+			block_leds_saved_delay_off_time[1] = -1;
+			block_leds_saved_brightness[1] = -1;
+			block_leds_saved_delay_on_time[2] = -1;
+			block_leds_saved_delay_off_time[2] = -1;
+			block_leds_saved_brightness[2] = -1;
+		}
+	}
+skipitall:
+	block_leds_not_blocking = ret;
+	return ret;
+}
+
 static void an30259a_start_led_pattern(int mode)
 {
 	int retval;
@@ -348,7 +460,18 @@ static void an30259a_start_led_pattern(int mode)
 	unsigned int delay_off_time = 2000;
 	client = b_client;
 	
-	if (mode > POWERING)
+	gkt_boost_cpu_call(false, true);
+	if (block_leds_check_allowed)
+	{
+		if (!check_restrictions())
+		{
+			if (led_debug_enable) pr_alert("SAVED LED MODE - %d", mode);
+			block_leds_saved_mode = mode;
+			return;
+		}
+	}
+		
+	if (mode > BOOTING)
 		return;
 	/* Set all LEDs Off */
 	an30259a_reset_register_work(reset);
@@ -357,11 +480,11 @@ static void an30259a_start_led_pattern(int mode)
 
 	/* Set to low power consumption mode */
 	if (LED_LOWPOWER_MODE == 1)
-		LED_DYNAMIC_CURRENT = 0x9;
+		LED_DYNAMIC_CURRENT = 0x8;
 	else if (led_enable_fade)
 		LED_DYNAMIC_CURRENT = 0x1;
 	else
-		LED_DYNAMIC_CURRENT = 0x48;
+		LED_DYNAMIC_CURRENT = 0x1;
 
 	if (led_intensity == 0) {	// then use stock values
 		led_r_brightness = LED_R_CURRENT;
@@ -409,16 +532,48 @@ static void an30259a_start_led_pattern(int mode)
 		pr_info("LED Missed Notifications Pattern on\n");
 		leds_on(LED_B, true, true,
 					led_b_brightness);
-		leds_set_slope_mode(client, LED_B,
-					10, 15, 15, 0, 1, 10, 0, 0, 0, 0);
+		if (led_enable_fade == 1)
+		{
+			if (led_time_on)
+				delay_on_time = led_time_on;
+			if (led_time_off)
+				delay_off_time = led_time_off;
+			leds_on(LED_B, true, true,
+						led_r_brightness);
+			leds_set_slope_mode(client, LED_B, 0, 30, 15, 0,
+				(delay_on_time + AN30259A_TIME_UNIT - 1) /
+				AN30259A_TIME_UNIT,
+				(delay_off_time + AN30259A_TIME_UNIT - 1) /
+				AN30259A_TIME_UNIT,
+				led_step_speed1, led_step_speed2, led_step_speed3, led_step_speed4);
+		}
+		else
+			leds_set_slope_mode(client, LED_B, 10, 15, 15, 0, 1, 10, 0, 0, 0, 0);
+		
 		break;
 
 	case LOW_BATTERY:
 		pr_info("LED Low Battery Pattern on\n");
 		leds_on(LED_R, true, true,
 					led_r_brightness);
-		leds_set_slope_mode(client, LED_R,
-					10, 15, 15, 0, 1, 10, 0, 0, 0, 0);
+		if (led_enable_fade == 1)
+		{
+			if (led_time_on)
+				delay_on_time = led_time_on;
+			if (led_time_off)
+				delay_off_time = led_time_off;
+			leds_on(LED_R, true, true,
+						led_r_brightness);
+			leds_set_slope_mode(client, LED_R, 0, 30, 15, 0,
+				(delay_on_time + AN30259A_TIME_UNIT - 1) /
+				AN30259A_TIME_UNIT,
+				(delay_off_time + AN30259A_TIME_UNIT - 1) /
+				AN30259A_TIME_UNIT,
+				led_step_speed1, led_step_speed2, led_step_speed3, led_step_speed4);
+		}
+		else
+			leds_set_slope_mode(client, LED_R, 10, 15, 15, 0, 1, 10, 0, 0, 0, 0);
+		
 		break;
 
 	case FULLY_CHARGED:
@@ -434,9 +589,15 @@ static void an30259a_start_led_pattern(int mode)
 		leds_set_slope_mode(client, LED_G,
 				0, 8, 4, 1, 2, 2, 3, 3, 3, 3);
 		leds_set_slope_mode(client, LED_B,
-				0, 15, 14, 12, 2, 2, 7, 7, 7, 7);
+				0, 8, 4, 1, 2, 2, 3, 3, 3, 3);
 		break;
-
+	case BOOTING:
+		pr_info("LED Booting Pattern on\n");
+		//leds_on(LED_G, true, true, LED_G_CURRENT);
+		leds_on(LED_B, true, true, LED_B_CURRENT);
+		//leds_set_slope_mode(client, LED_G, 0, 15, 0, 0, 1, 1, 0, 0, 0, 0);
+		leds_set_slope_mode(client, LED_B, 0, 15, 0, 0, 1, 1, 0, 0, 0, 0);
+		break;
 	default:
 		return;
 		break;
@@ -454,6 +615,28 @@ static void an30259a_set_led_blink(enum an30259a_led_enum led,
 	struct i2c_client *client;
 	client = b_client;
 
+	if (block_leds_check_allowed)
+	{
+		if (!check_restrictions())
+		{
+			if (brightness == LED_OFF)
+			{
+				if (led_debug_enable) pr_alert("REMOVED FROM FUNC LED BLINK - %d - %d - %d - %d", led, block_leds_saved_delay_on_time[led], block_leds_saved_delay_off_time[led], block_leds_saved_brightness[led]);
+				block_leds_saved_delay_on_time[led] = -1;
+				block_leds_saved_delay_off_time[led] = -1;
+				block_leds_saved_brightness[led] = -1;
+			}
+			else
+			{
+				if (led_debug_enable) pr_alert("SAVED FROM FUNC LED BLINK - %d - %d - %d - %d", led, delay_on_time, delay_off_time, brightness);
+				block_leds_saved_delay_on_time[led] = delay_on_time;
+				block_leds_saved_delay_off_time[led] = delay_off_time;
+				block_leds_saved_brightness[led] = brightness;
+			}
+			return;
+		}
+	}
+			
 	if (brightness == LED_OFF) {
 		leds_on(led, false, false, brightness);
 		return;
@@ -501,12 +684,12 @@ static void an30259a_set_led_blink(enum an30259a_led_enum led,
 
 	if (led_time_on)
 	{
-		pr_alert("LED OVER-RIDE - DELAY_ON_Orig=%d, DELAY_OFF_Orig=%d, DELAY_ON_New=%d, DELAY_OFF_New=%d", delay_on_time, delay_off_time, led_time_on, led_time_off);
+		if (led_debug_enable) pr_alert("LED OVER-RIDE - DELAY_ON_Orig=%d, DELAY_OFF_Orig=%d, DELAY_ON_New=%d, DELAY_OFF_New=%d", delay_on_time, delay_off_time, led_time_on, led_time_off);
 		delay_on_time = led_time_on;
 	}
 	if (led_time_off)
 	{
-		pr_alert("LED OVER-RIDE - DELAY_ON_Orig=%d, DELAY_OFF_Orig=%d, DELAY_ON_New=%d, DELAY_OFF_New=%d", delay_on_time, delay_off_time, led_time_on, led_time_off);
+		if (led_debug_enable) pr_alert("LED OVER-RIDE - DELAY_ON_Orig=%d, DELAY_OFF_Orig=%d, DELAY_ON_New=%d, DELAY_OFF_New=%d", delay_on_time, delay_off_time, led_time_on, led_time_off);
 		delay_off_time = led_time_off;
 	}
 
@@ -605,9 +788,8 @@ static ssize_t store_an30259a_led_blink(struct device *dev,
 	u8 led_g_brightness = 0;
 	u8 led_b_brightness = 0;
 
-	retval = sscanf(buf, "0x%x %d %d", &led_brightness,
-				&delay_on_time, &delay_off_time);
-
+	gkt_boost_cpu_call(false, true);
+	retval = sscanf(buf, "0x%x %d %d", &led_brightness, &delay_on_time, &delay_off_time);
 	if (retval == 0) {
 		dev_err(&data->client->dev, "fail to get led_blink value.\n");
 		return count;
@@ -864,6 +1046,92 @@ static ssize_t store_an30259a_led_step_bit_shift(struct device *dev, struct devi
 	return count;
 }
 
+static ssize_t show_an30259a_led_block_leds_time_start(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int ret;
+	ret = sprintf(buf, "%d\n", led_block_leds_time_start);
+	return ret;
+}
+static ssize_t store_an30259a_led_block_leds_time_start(struct device *dev, struct device_attribute *devattr, const char *buf, size_t count)
+{
+	int retval;
+	unsigned int val = 0;
+
+	retval = sscanf(buf, "%d", &val);
+	if (retval != 0 && (val == -1 || (val >= 0 && val <= 23))) {
+		led_block_leds_time_start = val;
+	}
+	if (!is_work_active && led_block_leds_time_start != -1 && led_block_leds_time_stop != -1)
+	{
+		is_work_active = true;
+		schedule_delayed_work_on(0, &check_led_time, msecs_to_jiffies(30000));
+	}
+	else if (led_block_leds_time_start == -1 || led_block_leds_time_stop == -1)
+		is_work_active = false;
+	return count;
+}
+
+static ssize_t show_an30259a_led_block_leds_time_stop(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int ret;
+	ret = sprintf(buf, "%d\n", led_block_leds_time_stop);
+	return ret;
+}
+static ssize_t store_an30259a_led_block_leds_time_stop(struct device *dev, struct device_attribute *devattr, const char *buf, size_t count)
+{
+	int retval;
+	unsigned int val = 0;
+
+	retval = sscanf(buf, "%d", &val);
+	if (retval != 0 && (val == -1 || (val >= 0 && val <= 23))) {
+		led_block_leds_time_stop = val;
+	}
+	if (!is_work_active && led_block_leds_time_start != -1 && led_block_leds_time_stop != -1)
+	{
+		is_work_active = true;
+		schedule_delayed_work_on(0, &check_led_time, msecs_to_jiffies(30000));
+	}
+	else if (led_block_leds_time_start == -1 || led_block_leds_time_stop == -1)
+		is_work_active = false;
+	return count;
+}
+
+static ssize_t show_an30259a_led_always_disable(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int ret;
+	ret = sprintf(buf, "%d\n", led_always_disable);
+	return ret;
+}
+static ssize_t store_an30259a_led_always_disable(struct device *dev, struct device_attribute *devattr, const char *buf, size_t count)
+{
+	int retval;
+	unsigned int val = 0;
+
+	retval = sscanf(buf, "%d", &val);
+	if (retval != 0 && (val == 0 || val == 1)) {
+		led_always_disable = val;
+	}
+	return count;
+}
+
+static ssize_t show_an30259a_led_debug_enable(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int ret;
+	ret = sprintf(buf, "%d\n", led_debug_enable);
+	return ret;
+}
+static ssize_t store_an30259a_led_debug_enable(struct device *dev, struct device_attribute *devattr, const char *buf, size_t count)
+{
+	int retval;
+	unsigned int val = 0;
+
+	retval = sscanf(buf, "%d", &val);
+	if (retval != 0 && (val == 0 || val == 1)) {
+		led_debug_enable = val;
+	}
+	return count;
+}
+
 static ssize_t store_led_r(struct device *dev,
 	struct device_attribute *devattr, const char *buf, size_t count)
 {
@@ -1065,7 +1333,14 @@ static DEVICE_ATTR(led_step_speed4, 0664, show_an30259a_led_step_speed4, \
 				store_an30259a_led_step_speed4);
 static DEVICE_ATTR(led_step_bit_shift, 0664, show_an30259a_led_step_bit_shift, \
 				store_an30259a_led_step_bit_shift);
-
+static DEVICE_ATTR(led_block_leds_time_start, 0664, show_an30259a_led_block_leds_time_start, \
+				store_an30259a_led_block_leds_time_start);
+static DEVICE_ATTR(led_block_leds_time_stop, 0664, show_an30259a_led_block_leds_time_stop, \
+				store_an30259a_led_block_leds_time_stop);
+static DEVICE_ATTR(led_always_disable, 0664, show_an30259a_led_always_disable, \
+				store_an30259a_led_always_disable);
+static DEVICE_ATTR(led_debug_enable, 0664, show_an30259a_led_debug_enable, \
+				store_an30259a_led_debug_enable);
 static DEVICE_ATTR(led_br_lev, 0664, NULL, \
 					store_an30259a_led_br_lev);
 static DEVICE_ATTR(led_lowpower, 0664, NULL, \
@@ -1100,6 +1375,10 @@ static struct attribute *sec_led_attributes[] = {
 	&dev_attr_led_step_speed3.attr,
 	&dev_attr_led_step_speed4.attr,
 	&dev_attr_led_step_bit_shift.attr,
+	&dev_attr_led_block_leds_time_start.attr,
+	&dev_attr_led_block_leds_time_stop.attr,
+	&dev_attr_led_always_disable.attr,
+	&dev_attr_led_debug_enable.attr,
 	&dev_attr_led_intensity.attr,
 	&dev_attr_led_br_lev.attr,
 	&dev_attr_led_lowpower.attr,
@@ -1163,12 +1442,21 @@ static int __devinit an30259a_initialize(struct i2c_client *client,
 	return 0;
 }
 
+static void check_led_timer(struct work_struct *work)
+{
+	check_restrictions();
+	if (is_work_active && led_block_leds_time_start != -1 && led_block_leds_time_stop != -1)
+		schedule_delayed_work_on(0, &check_led_time, msecs_to_jiffies(30000));
+}
 
 static int __devinit an30259a_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
 	struct an30259a_data *data;
 	int ret, i;
+	
+	INIT_DELAYED_WORK(&check_led_time, check_led_timer);
+
 	dev_dbg(&client->adapter->dev, "%s\n", __func__);
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		dev_err(&client->dev, "need I2C_FUNC_I2C.\n");
@@ -1215,6 +1503,7 @@ static int __devinit an30259a_probe(struct i2c_client *client,
 		goto exit;
 	}
 #endif
+	an30259a_start_led_pattern(BOOTING);
 	return ret;
 exit:
 	mutex_destroy(&data->mutex);

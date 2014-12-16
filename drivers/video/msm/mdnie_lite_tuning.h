@@ -73,6 +73,9 @@ enum Lcd_mDNIe_UI {
 	mDNIe_BROWSER_MODE,
 	mDNIe_eBOOK_MODE,
 	mDNIE_BLINE_MODE,
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL)
+	mDNIE_DARK_SCREEN_MODE,
+#endif
 #if defined(CONFIG_TDMB)
 	mDNIe_DMB_MODE = 20,
 	mDNIe_DMB_WARM_MODE,
@@ -92,13 +95,8 @@ enum Lcd_mDNIe_Negative {
 };
 
 enum Background_Mode {
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 	DYNAMIC_MODE = 0,
 	STANDARD_MODE,
-#else
-	STANDARD_MODE = 0,
-	DYNAMIC_MODE,
-#endif
 #if !defined(CONFIG_SUPPORT_DISPLAY_OCTA_TFT)
 	NATURAL_MODE,
 #endif
@@ -117,6 +115,9 @@ enum ACCESSIBILITY {
         ACCESSIBILITY_OFF,
         NEGATIVE,
         COLOR_BLIND,
+ #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL)
+        DARK_SCREEN,
+ #endif
         ACCESSIBILITY_MAX,
 };
 

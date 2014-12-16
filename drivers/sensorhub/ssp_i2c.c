@@ -15,8 +15,7 @@
 #include "ssp.h"
 
 #define LIMIT_DELAY_CNT		200
-extern void set_gps_status(bool stat);
-extern void set_call_in_progress(bool state);
+#include <linux/cpufreq_kt.h>
 
 int waiting_wakeup_mcu(struct ssp_data *data)
 {
@@ -156,6 +155,12 @@ int ssp_send_cmd(struct ssp_data *data, char command)
 		}
 	}
 
+	if (command == 0xd9)
+	{
+		pr_alert("KT CALL COMING IN FROM SEND CMD: %d\n", command);
+		gkt_boost_cpu_call(true, true);
+	}
+	
 	data->uInstFailCnt = 0;
 	ssp_dbg("[SSP]: %s - command 0x%x\n", __func__, command);
 

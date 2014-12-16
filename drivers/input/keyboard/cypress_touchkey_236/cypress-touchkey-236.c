@@ -9,8 +9,9 @@
  *
  */
 
-//#define SEC_TOUCHKEY_DEBUG
+#define SEC_TOUCHKEY_DEBUG
 
+#include <linux/cpufreq_kt.h>
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/init.h>
@@ -136,6 +137,8 @@ struct cypress_touchkey_info {
 	bool charging_mode;
 #endif
 
+	atomic_t keypad_enable;
+
 
 };
 
@@ -163,13 +166,6 @@ static struct pm_gpio tkey_sleep_int = {
 	.function	= PM_GPIO_FUNC_NORMAL,
 	.inv_int_pol	= 0,
 };
-
-extern void boostpulse_relay_kt(void);
-static bool kt_is_active_benabled = false;
-void kt_is_active_benabled_touchkey(bool val)
-{
-	kt_is_active_benabled = val;
-}
 
 static void cypress_int_gpio_setting(bool value)
 {
@@ -232,6 +228,25 @@ static void cypress_gpio_setting(bool value)
 
 			printk(KERN_DEBUG "%s in suspend \n",__func__);
 		}
+#elif defined(CONFIG_MACH_JFVE_EUR)
+	if(value) {
+		ret = gpio_request(GPIO_TOUCHKEY_SCL_2, "TKEY_SCL");
+		if (ret)
+			printk(KERN_ERR "%s: request GPIO %s err %d.",\
+					__func__, "TKEY_SCL_2", ret);
+
+		ret = gpio_request(GPIO_TOUCHKEY_SDA, "TKEY_SDA");
+		if (ret)
+			printk(KERN_ERR "%s: request GPIO %s err %d.",\
+					__func__, "TKEY_SDA", ret);
+
+		printk(KERN_DEBUG "%s in resume \n",__func__);
+	} else {
+		gpio_free(GPIO_TOUCHKEY_SCL_2);
+		gpio_free(GPIO_TOUCHKEY_SDA);
+		printk(KERN_DEBUG "%s in suspend \n",__func__);
+	}
+
 #else /*VZW, SPR, USC, CRI*/
 	if(value) {
 		if (system_rev < 10) {
@@ -479,7 +494,7 @@ static ssize_t brightness_level_show(struct device *dev,
 {
 	int count;
 
-	count = snprintf(buf, sizeof(buf), "%d\n", vol_mv_level);
+	count = snprintf(buf, (int)sizeof(buf), "%d\n", vol_mv_level);
 
 	printk(KERN_DEBUG "[TouchKey] Touch LED voltage = %d\n", vol_mv_level);
 	return count;
@@ -766,6 +781,10 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 	int press;
 	int ret;
 
+	if (!atomic_read(&info->keypad_enable)) {
+		goto out;
+	}
+
 	ret = gpio_get_value(info->pdata->gpio_int);
 	if (ret) {
 		printk(KERN_ERR "not real interrupt (%d).\n", ret);
@@ -786,12 +805,12 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 
 	press = !(buf[0] & PRESS_BIT_MASK);
 	code = (int)(buf[0] & KEYCODE_BIT_MASK) - 1;
-	//printk(KERN_ERR
-	//	"[TouchKey]press=%d, code=%d\n", press, code);
+	printk(KERN_ERR
+		"[TouchKey]press=%d, code=%d\n", press, code);
 	
-	if (kt_is_active_benabled && press == 1 && (info->keycode[code] == 158 || info->keycode[code] == 139))
+	if (ktoonservative_is_active && press == 1 && (info->keycode[code] == 158 || info->keycode[code] == 139))
 	{
-		boostpulse_relay_kt();
+		ktoonservative_boostpulse(true);
 		//pr_alert("KEY_PRESS: %d-%d\n", info->keycode[code], press);
 	}
 	
@@ -930,15 +949,14 @@ static ssize_t touchkey_firm_status_show(struct device *dev,
 {
 	struct cypress_touchkey_info *info = dev_get_drvdata(dev);
 	int count = 0;
-	char buff[16] = {0};
 	dev_info(&info->client->dev, "[TouchKey] touchkey_update_status: %d\n",
 						info->touchkey_update_status);
 	if (info->touchkey_update_status == 0)
-		count = snprintf(buff, sizeof(buff), "PASS\n");
+		count = snprintf(buf, 20, "PASS\n");
 	else if (info->touchkey_update_status == 1)
-		count = snprintf(buff, sizeof(buff), "Downloading\n");
+		count = snprintf(buf, 20, "Downloading\n");
 	else if (info->touchkey_update_status == -1)
-		count = snprintf(buff, sizeof(buff), "Fail\n");
+		count = snprintf(buf, 20, "Fail\n");
 	return count;
 }
 
@@ -947,16 +965,15 @@ static ssize_t touch_update_read(struct device *dev,
 {
 	struct cypress_touchkey_info *info = dev_get_drvdata(dev);
 	int count = 0;
-	char buff[16] = {0};
 
 	dev_info(&info->client->dev, "[TouchKey] touchkey_update_read: %d\n",
 						info->touchkey_update_status);
 	if (info->touchkey_update_status == 0)
-		count = snprintf(buff, sizeof(buff), "PASS\n");
+		count = snprintf(buf, 20, "PASS\n");
 	else if (info->touchkey_update_status == 1)
-		count = snprintf(buff, sizeof(buff), "Downloading\n");
+		count = snprintf(buf, 20, "Downloading\n");
 	else if (info->touchkey_update_status == -1)
-		count = snprintf(buff, sizeof(buff), "Fail\n");
+		count = snprintf(buf, 20, "Fail\n");
 	return count;
 }
 
@@ -1382,6 +1399,38 @@ static ssize_t flip_cover_mode_enable(struct device *dev,
 #endif
 
 
+static ssize_t sec_keypad_enable_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct cypress_touchkey_info *info = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", atomic_read(&info->keypad_enable));
+}
+
+static ssize_t sec_keypad_enable_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct cypress_touchkey_info *info = dev_get_drvdata(dev);
+	int i;
+
+	unsigned int val = 0;
+	sscanf(buf, "%d", &val);
+	val = (val == 0 ? 0 : 1);
+	atomic_set(&info->keypad_enable, val);
+	if (val) {
+		for (i = 0; i < ARRAY_SIZE(info->keycode); i++)
+			set_bit(info->keycode[i], info->input_dev->keybit);
+	} else {
+		for (i = 0; i < ARRAY_SIZE(info->keycode); i++)
+			clear_bit(info->keycode[i], info->input_dev->keybit);
+	}
+	input_sync(info->input_dev);
+
+	return count;
+}
+
+static DEVICE_ATTR(keypad_enable, S_IRUGO|S_IWUSR, sec_keypad_enable_show,
+	      sec_keypad_enable_store);
 static DEVICE_ATTR(touchkey_firm_update_status,
 		S_IRUGO | S_IWUSR | S_IWGRP, touchkey_firm_status_show, NULL);
 static DEVICE_ATTR(touchkey_firm_version_panel, S_IRUGO,
@@ -1464,7 +1513,7 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 	info->power_onoff = pdata->power_onoff;
 	info->touchkey_update_status = 0;
 	memcpy(info->keycode, pdata->touchkey_keycode,
-			sizeof(pdata->touchkey_keycode));
+			(int)sizeof(pdata->touchkey_keycode));
 	snprintf(info->phys, sizeof(info->phys),
 			"%s/input0", dev_name(&client->dev));
 	input_dev->name = "sec_touchkey";
@@ -1482,6 +1531,9 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 	set_bit(EV_KEY, input_dev->evbit);
 	set_bit(EV_LED, input_dev->evbit);
 	set_bit(LED_MISC, input_dev->ledbit);
+
+	atomic_set(&info->keypad_enable, 1);
+
 	for (i = 0; i < ARRAY_SIZE(info->keycode); i++)
 		set_bit(info->keycode[i], input_dev->keybit);
 
@@ -1514,15 +1566,14 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 #if defined(CONFIG_MACH_JF_DCM)
 	msleep(50);
 #endif
-	ret = i2c_touchkey_read(info->client, KEYCODE_REG, data, 6);
 
-#ifdef CONFIG_TOUCHSCREEN_FACTORY_PLATFORM
-	if (ret < 0) {
-		printk(KERN_ERR "[TouchKey] %s %d i2c transfer error\n",
+	if (get_lcd_attached() == 0) {
+		printk(KERN_ERR "[TouchKey] %s %d Device wasn't connected to board \n",
 			__func__, __LINE__);
 		goto err_i2c_check;
 		}
-#else
+
+	ret = i2c_touchkey_read(info->client, KEYCODE_REG, data, 6);
 	if (ret < 0) {
 		disable_irq(client->irq);
 		if (ISSP_main() == 0) {
@@ -1535,7 +1586,6 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 			goto err_i2c_check;
 			}
 		}
-#endif
 
 #ifdef TSP_BOOSTER
 	cypress_init_dvfs(info);
@@ -1596,6 +1646,10 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 				enable_irq(client->irq);
 				break;
 			}
+			info->power_onoff(0);
+			msleep(70);
+			info->power_onoff(1);
+			msleep(50);
 			dev_err(&client->dev,
 				"[TouchKey] Touchkey_update failed... retry...\n");
 		}
@@ -1625,6 +1679,10 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 				enable_irq(client->irq);
 				break;
 			}
+			info->power_onoff(0);
+			msleep(70);
+			info->power_onoff(1);
+			msleep(50);
 			dev_err(&client->dev,
 				"[TouchKey] Touchkey_update failed... retry...\n");
 		}
@@ -1799,6 +1857,14 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 		dev_attr_touchkey_brightness_level.attr.name);
 		goto err_sysfs;
 	}
+
+	if (device_create_file(sec_touchkey,
+		&dev_attr_keypad_enable) < 0) {
+		printk(KERN_ERR "Failed to create device file(%s)!\n",
+		dev_attr_keypad_enable.attr.name);
+		goto err_sysfs;
+	}
+
 #if defined(CONFIG_GLOVE_TOUCH)
 	if (device_create_file(sec_touchkey,
 		&dev_attr_glove_mode) < 0) {

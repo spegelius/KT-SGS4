@@ -177,13 +177,8 @@ irqreturn_t msm_gemini_core_irq(int irq_num, void *context)
 	spin_unlock_irqrestore(&reset_lock, flags);
 	gemini_irq_status = msm_gemini_hw_irq_get_status();
 
-#if defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-	pr_err("[%s:%d] gemini_irq_status = %0x\n", __func__, __LINE__,
-			gemini_irq_status);
-#else
-	GMN_DBG("%s:%d] gemini_irq_status = %0x\n", __func__, __LINE__,
-			gemini_irq_status);
-#endif
+	pr_err("%s:%d] gemini_irq_status = %0x\n", __func__, __LINE__,
+		gemini_irq_status);
 
 	/*For reset and framedone IRQs, clear all bits*/
 	if (gemini_irq_status & 0x400) {
