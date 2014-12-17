@@ -55,7 +55,7 @@ if [ -z $BOARD ]; then
 fi
 
 echo "Make the kernel"
-make VARIANT_DEFCONFIG=${BOARD}_${CARRIER}"_defconfig" SELINUX_DEFCONFIG=jfselinux_defconfig SELINUX_LOG_DEFCONFIG=jfselinux_log_defconfig KT_jf_defconfig
+make SELINUX_DEFCONFIG=jfselinux_defconfig SELINUX_LOG_DEFCONFIG=jfselinux_log_defconfig KT_${BOARD}_defconfig
 
 echo "Modding .config file - "$KTVER
 sed -i 's,CONFIG_LOCALVERSION="-KT-SGS4",CONFIG_LOCALVERSION="'$KTVER'",' .config
@@ -72,8 +72,8 @@ fi;
 echo "Copy modules to Package"
 cp -a $(find . -name *.ko -print |grep -v initramfs) $PACKAGEDIR/system/lib/modules/
 if [ $ADD_KTWEAKER = 'Y' ]; then
-	cp /home/spegelius/storage/ktapps/com.ktoonsez.KTweaker.apk $PACKAGEDIR/system/app/com.ktoonsez.KTweaker.apk
-	cp /home/spegelius/storage/ktapps/com.ktoonsez.KTmonitor.apk $PACKAGEDIR/system/app/com.ktoonsez.KTmonitor.apk
+	cp $PARENT_DIR/ktapps/com.ktoonsez.KTweaker.apk $PACKAGEDIR/system/app/com.ktoonsez.KTweaker.apk
+	cp $PARENT_DIR/ktapps/com.ktoonsez.KTmonitor.apk $PACKAGEDIR/system/app/com.ktoonsez.KTmonitor.apk
 fi;
 
 if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
@@ -93,7 +93,7 @@ if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
 	#if [ $EXEC_LOKI = 'Y' ]; then
 	#	cp -R ../META-INF-SEC ./META-INF
 	#else
-		cp -R ../META-INF .
+		cp -R $PARENT_DIR/ktapps/META-INF .
 	#fi;
 	cp -R ../kernel .
 
