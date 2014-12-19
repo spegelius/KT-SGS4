@@ -1,6 +1,6 @@
 #!/bin/sh
+
 export PLATFORM="AOSP"
-export MREV="KK4.4"
 export CURDATE=`date "+%m.%d.%Y"`
 export MUXEDNAMELONG="KT-SGS4-$MREV-$PLATFORM-$CARRIER-$CURDATE"
 export MUXEDNAMESHRT="KT-SGS4-$MREV-$PLATFORM-$CARRIER*"
@@ -8,25 +8,35 @@ export KTVER="--$MUXEDNAMELONG--"
 export KERNELDIR=`readlink -f .`
 export PARENT_DIR=`readlink -f ..`
 export INITRAMFS_DEST=$KERNELDIR/kernel/usr/initramfs
-export INITRAMFS_SOURCE=`readlink -f ..`/Ramdisks/$PLATFORM"_"$CARRIER"4.4"
+export INITRAMFS_SOURCE=`readlink -f ..`/Ramdisk
+export INITRAMFS_BRANCH=$(echo $PLATFORM | awk '{print tolower($0)}')"-"$VERSION
 export CONFIG_$PLATFORM_BUILD=y
 export PACKAGEDIR=$PARENT_DIR/Packages/$PLATFORM
+
 #Enable FIPS mode
 export USE_SEC_FIPS_MODE=true
 export ARCH=arm
+
 # export CROSS_COMPILE=/home/ktoonsez/aokp4.2/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-
 #export CROSS_COMPILE=$PARENT_DIR/linaro4.7/bin/arm-eabi-
-export CROSS_COMPILE=/media/storage/toolchain/linaro-4.7-12.10/bin/arm-linux-gnueabihf-
-#export CROSS_COMPILE=/media/storage/CM11/prebuilts/gcc/linux-x86/arm/arm-eabi-4.7/bin/arm-eabi-
-#export CROSS_COMPILE=$PARENT_DIR/linaro4.9-a15/bin/arm-cortex_a15-linux-gnueabihf-
+#export CROSS_COMPILE=/media/storage/toolchain/linaro-4.7-12.10/bin/arm-linux-gnueabihf-
+export CROSS_COMPILE=/media/storage/toolchain/arm-linux-androideabi-4.8/bin/arm-linux-androideabi-
+#export CROSS_COMPILE=/media/storage/toolchain/sabermod-arm-linux-androideabi-4.9/bin/arm-linux-androideabi-
+#export CROSS_COMPILE=/media/storage/toolchain/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/arm-linux-gnueabihf-
 
+pushd $INITRAMFS_SOURCE
+git checkout $INITRAMFS_BRANCH
+if [ ! $? -eq 0 ]; then
+  exit 1
+fi
+popd
 
-time_start=$(date +%s.%N)
+	time_start=$(date +%s.%N)
 
-echo "Remove old Package Files"
-rm -rf $PACKAGEDIR/*
+	echo "Remove old Package Files"
+	rm -rf $PACKAGEDIR/*
 
-echo "Setup Package Directory"
+	echo "Setup Package Directory"
 mkdir -p $PACKAGEDIR/system/app
 mkdir -p $PACKAGEDIR/system/lib/modules
 mkdir -p $PACKAGEDIR/system/etc/init.d
