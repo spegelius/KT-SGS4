@@ -31,43 +31,43 @@ if [ ! $? -eq 0 ]; then
 fi
 popd
 
-	time_start=$(date +%s.%N)
+time_start=$(date +%s.%N)
 
-	echo "Remove old Package Files"
-	rm -rf $PACKAGEDIR/*
+echo "** Remove old Package Files"
+rm -rf $PACKAGEDIR/*
 
-	echo "Setup Package Directory"
+echo "** Setup Package Directory"
 mkdir -p $PACKAGEDIR/system/app
 mkdir -p $PACKAGEDIR/system/lib/modules
 mkdir -p $PACKAGEDIR/system/etc/init.d
 
-echo "Create initramfs dir"
+echo "** Create initramfs dir"
 mkdir -p $INITRAMFS_DEST
 
-echo "Remove old initramfs dir"
+echo "** Remove old initramfs dir"
 rm -rf $INITRAMFS_DEST/*
 
-echo "Copy new initramfs dir"
+echo "** Copy new initramfs dir"
 cp -R $INITRAMFS_SOURCE/* $INITRAMFS_DEST
 
-echo "chmod initramfs dir"
+echo "** chmod initramfs dir"
 chmod -R g-w $INITRAMFS_DEST/*
 rm $(find $INITRAMFS_DEST -name EMPTY_DIRECTORY -print)
 rm -rf $(find $INITRAMFS_DEST -name .git -print)
 
-echo "Remove old zImage"
+echo "** Remove old zImage"
 rm $PACKAGEDIR/zImage
 rm arch/arm/boot/zImage
 
-echo "$BOARD"
+echo "** Board: $BOARD"
 if [ -z $BOARD ]; then
     export BOARD="jf"
 fi
 
-echo "Make the kernel"
+echo "** Make the kernel"
 make SELINUX_DEFCONFIG=jfselinux_defconfig SELINUX_LOG_DEFCONFIG=jfselinux_log_defconfig KT_${BOARD}_defconfig
 
-echo "Modding .config file - "$KTVER
+echo "** Modding .config file - "$KTVER
 sed -i 's,CONFIG_LOCALVERSION="-KT-SGS4",CONFIG_LOCALVERSION="'$KTVER'",' .config
 
 HOST_CHECK=`uname -n`
@@ -79,7 +79,7 @@ else
 	make -j`grep 'processor' /proc/cpuinfo | wc -l`
 fi;
 
-echo "Copy modules to Package"
+echo "** Copy modules to Package"
 cp -a $(find . -name *.ko -print |grep -v initramfs) $PACKAGEDIR/system/lib/modules/
 if [ $ADD_KTWEAKER = 'Y' ]; then
 	cp $PARENT_DIR/ktapps/com.ktoonsez.KTweaker.apk $PACKAGEDIR/system/app/com.ktoonsez.KTweaker.apk
@@ -87,12 +87,12 @@ if [ $ADD_KTWEAKER = 'Y' ]; then
 fi;
 
 if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
-	echo "Copy zImage to Package"
+	echo "** Copy zImage to Package"
 	cp arch/arm/boot/zImage $PACKAGEDIR/zImage
 
-	echo "Make boot.img"
+	echo "** Make boot.img"
 	./mkbootfs $INITRAMFS_DEST | gzip > $PACKAGEDIR/ramdisk.gz
-	./mkbootimg --cmdline 'androidboot.hardware=qcom user_debug=31 zcache msm_rtb.filter=0x3F ehci-hcd.park=3' --kernel $PACKAGEDIR/zImage --ramdisk $PACKAGEDIR/ramdisk.gz --base 0x80200000 --pagesize 2048 --ramdisk_offset 0x02000000 --output $PACKAGEDIR/boot.img 
+	./mkbootimg --cmdline "$RD_CMDLINE" --kernel $PACKAGEDIR/zImage --ramdisk $PACKAGEDIR/ramdisk.gz --base 0x80200000 --pagesize 2048 --ramdisk_offset 0x02000000 --output $PACKAGEDIR/boot.img 
 	#if [ $EXEC_LOKI = 'Y' ]; then
 	#	echo "Executing loki"
 	#	./loki_patch-linux-x86_64 boot aboot$CARRIER.img $PACKAGEDIR/boot.img $PACKAGEDIR/boot.lok
@@ -113,7 +113,7 @@ if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
 	zip -r ../$MUXEDNAMELONG.zip .
 
 	time_end=$(date +%s.%N)
-	echo -e "${BLDYLW}Total time elapsed: ${TCTCLR}${TXTGRN}$(echo "($time_end - $time_start) / 60"|bc ) ${TXTYLW}minutes${TXTGRN} ($(echo "$time_end - $time_start"|bc ) ${TXTYLW}seconds) ${TXTCLR}"
+	echo -e "** ${BLDYLW}Total time elapsed: ${TCTCLR}${TXTGRN}$(echo "($time_end - $time_start) / 60"|bc ) ${TXTYLW}minutes${TXTGRN} ($(echo "$time_end - $time_start"|bc ) ${TXTYLW}seconds) ${TXTCLR}"
 
 	#export DLNAME="http://ktoonsez.jonathanjsimon.com/sgs4/$PLATFORM/$MUXEDNAMELONG.zip"
 	
@@ -136,5 +136,5 @@ if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
 
 	cd $KERNELDIR
 else
-	echo "KERNEL DID NOT BUILD! no zImage exist"
+	echo "** KERNEL DID NOT BUILD! no zImage exist"
 fi;
