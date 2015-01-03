@@ -663,7 +663,9 @@ static ssize_t cpufreq_max_limit_store(struct kobject *kobj,
 	if (ret != 1)
 		return -EINVAL;
 
-	set_freq_limit(DVFS_APPS_MAX_ID, freq_max_limit);
+	// disabled for now
+	//set_freq_limit(DVFS_APPS_MAX_ID, freq_max_limit);
+    //pr_alert("KT cpufreq_max_limit_store %d", freq_max_limit);
 
 	return n;
 }
