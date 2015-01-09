@@ -758,6 +758,9 @@ static int mipi_panel_power_tft(int enable)
 		}
 #endif
 		gpio_direction_output(gpio27, 1);/*LED_DRIVER(gpio27);*/
+		set_screen_on_off_mhz(true);
+		if (ktoonservative_is_active)
+			ktoonservative_screen_is_on(true);
 	} else {
 		if (system_rev == 0)
 			gpio_direction_output(gpio43, 0);
@@ -856,6 +859,9 @@ static int mipi_panel_power_tft(int enable)
 		}
 #endif
 		msleep(20);
+		set_screen_on_off_mhz(false);
+		if (ktoonservative_is_active)
+			ktoonservative_screen_is_on(false);
 	}
 
 	return rc;
