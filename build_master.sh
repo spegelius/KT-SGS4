@@ -19,10 +19,10 @@ export ARCH=arm
 
 # export CROSS_COMPILE=/home/ktoonsez/aokp4.2/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-
 #export CROSS_COMPILE=$PARENT_DIR/linaro4.7/bin/arm-eabi-
-export CROSS_COMPILE=/media/storage/toolchain/linaro-4.7-12.10/bin/arm-linux-gnueabihf-
+#export CROSS_COMPILE=/media/storage/toolchain/linaro-4.7-12.10/bin/arm-linux-gnueabihf-
 #export CROSS_COMPILE=/media/storage/toolchain/arm-linux-androideabi-4.8/bin/arm-linux-androideabi-
 #export CROSS_COMPILE=/media/storage/toolchain/sabermod-arm-linux-androideabi-4.9/bin/arm-linux-androideabi-
-#export CROSS_COMPILE=/media/storage/toolchain/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/arm-linux-gnueabihf-
+export CROSS_COMPILE=/media/storage/toolchain/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/arm-linux-gnueabihf-
 
 echo "** Checkout initramfs"
 cd $INITRAMFS_SOURCE
