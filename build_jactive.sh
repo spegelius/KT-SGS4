@@ -8,9 +8,16 @@ export RD_CMDLINE="androidboot.hardware=qcom user_debug=31 zcache msm_rtb.filter
 if [ "$1" == "lp" ]; then
     export MREV="LP5.0"
     export VERSION=5.0
-else
+elif [ "$1" == "kk" ]; then
     export MREV="KK4.4"
     export VERSION=4.4
-    
+else
+    echo "Unknown type, use kk or lp"
+    exit 1
 fi
+
+if [ "$2" == "--extra" ]; then
+    export EXTRAVER=$3
+fi
+
 ./build_master.sh
