@@ -1,8 +1,18 @@
 #!/bin/sh
 
+if [ "$MREV" == "" ]; then
+    echo "No MREV defined, us kk or lp in build command"
+    exit 1
+fi
+
+if [ "$EXTRAVER" != "" ]; then
+    echo $EXTRAVER
+    EXTRAVER="-$EXTRAVER"
+fi
+
 export PLATFORM="AOSP"
 export CURDATE=`date "+%m.%d.%Y"`
-export MUXEDNAMELONG="KT-SGS4-$MREV-$PLATFORM-$CARRIER-$CURDATE"
+export MUXEDNAMELONG="KT-SGS4-$MREV-$PLATFORM-$CARRIER$EXTRAVER-$CURDATE"
 export MUXEDNAMESHRT="KT-SGS4-$MREV-$PLATFORM-$CARRIER*"
 export KTVER="--$MUXEDNAMELONG--"
 export KERNELDIR=`readlink -f .`
@@ -109,8 +119,10 @@ if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
 
 	rm ramdisk.gz
 	rm zImage
-	rm ../$MUXEDNAMESHRT.zip
+	rm ../$MUXEDNAMESHRT.zip*
 	zip -r ../$MUXEDNAMELONG.zip .
+	cd ..
+        md5sum $MUXEDNAMELONG.zip > $MUXEDNAMELONG.zip.md5sum 
 
 	time_end=$(date +%s.%N)
 	echo -e "** ${BLDYLW}Total time elapsed: ${TCTCLR}${TXTGRN}$(echo "($time_end - $time_start) / 60"|bc ) ${TXTYLW}minutes${TXTGRN} ($(echo "$time_end - $time_start"|bc ) ${TXTYLW}seconds) ${TXTCLR}"
