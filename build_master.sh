@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [ "$MREV" == "" ]; then
     echo "No MREV defined, us kk or lp in build command"
