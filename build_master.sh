@@ -32,7 +32,8 @@ export ARCH=arm
 #export CROSS_COMPILE=/media/storage/toolchain/linaro-4.7-12.10/bin/arm-linux-gnueabihf-
 #export CROSS_COMPILE=/media/storage/toolchain/arm-linux-androideabi-4.8/bin/arm-linux-androideabi-
 #export CROSS_COMPILE=/media/storage/toolchain/sabermod-arm-linux-androideabi-4.9/bin/arm-linux-androideabi-
-export CROSS_COMPILE=/media/storage/toolchain/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/arm-linux-gnueabihf-
+#export CROSS_COMPILE=/media/storage/toolchain/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/arm-linux-gnueabihf-
+export CROSS_COMPILE=/media/storage/toolchain/gcc-linaro-4.9-2014.11-x86_64_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-
 
 pushd $INITRAMFS_SOURCE
 git checkout $INITRAMFS_BRANCH
